@@ -1,0 +1,16 @@
+{
+  "name": "glue-ws",
+  "version": "0.0.1",
+  "description": "minimalistic framework for websocket applications",
+  "main": "index.js",
+  "dependencies": {
+    "msgpack-lite": "0.1.26",
+    "uws": "9.148.0"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "devDependencies": {},
+  "license": "ISC",
+  "author": "Zack Seliger"
+}
