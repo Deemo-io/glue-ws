@@ -1,7 +1,8 @@
 //GLUE.js client
-var GlueClient = function() {
+var GlueClient = function(options={updateFPS: 60}) {
 var GLUE = {ws: null, frames: [], frameTimes: [], currentTime: 0, prevTime: 0, dt: 0, instances: [], classes: new Map(), packetFunctions: new Map(), objects: [], packetsToSend: [], time: 0};
-GLUE.updateTime = (1/60)*1000;
+GLUE.updateFPS = options.updateFPS;
+GLUE.updateTime = (1/GLUE.updateFPS)*1000;
 
 GLUE.init = function(ip) {
 	GLUE.ws = new WebSocket(ip);

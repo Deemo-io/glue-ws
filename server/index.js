@@ -1,5 +1,5 @@
 //GLUE.js server
-exports.Server = function() {
+exports.Server = function(options={updateFPS: 60, packetFPS: 20}) {
 var server = require('uws').Server;
 var msgpack = require("msgpack-lite");
 
@@ -8,9 +8,10 @@ GLUE.currTime = Date.now();
 GLUE.prevTime = 0;
 GLUE.dt = 0;
 GLUE.realTime = 0;
-GLUE.updateFPS = 60;
-GLUE.packetFPS = 20;
+GLUE.updateFPS = options.updateFPS;
+GLUE.packetFPS = options.packetFPS;
 GLUE.updateTime = (1/GLUE.updateFPS) * 1000;
+GLUE.packetTime = (1/GLUE.packetFPS) * 1000;
 
 function safelyParseJSON(message) {
 	var parsed;
@@ -135,9 +136,9 @@ GLUE.roundFloatsInObj = function(pack) {
 
 GLUE.start = function(port=8443) {
 	GLUE.wss = new server({port: port});
-	setInterval(GLUE.update, (1/GLUE.updateFPS)*1000);
-	setInterval(GLUE.packetUpdate, (1/GLUE.packetFPS)*1000);
-	console.log("Listening on port "+port+"...");
+	setInterval(GLUE.update, GLUE.updateTime);
+	setInterval(GLUE.packetUpdate, GLUE.packetTime);
+	console.log("GLUE listening on port "+port+"...");
 	
 	GLUE.wss.on('connection', function(ws) {
 		ws.packetsToSend = [];

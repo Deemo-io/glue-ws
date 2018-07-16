@@ -20,5 +20,5 @@ network.onDisconnect = function() {
 The client for glue-ws can be found on the [github repository](https://github.com/Twist177/glue-ws). After including the client in your code you can set up a connection to a server running glue-ws with this code:
 ```
 var client = new GlueClient();
-client.init("127.0.0.1:8443");
+client.init("ws://127.0.0.1:8443");
 ```
