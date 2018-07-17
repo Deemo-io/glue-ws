@@ -28,7 +28,8 @@ var GlueClient = function(options={updateFPS: 60}) {
 
 	GLUE.executeFrame = function(messages) {
 		for (var i = 0; i < messages.length; i++) {
-			if (messages[i].t != "t") {
+			console.log(messages);
+			if (messages[i].t != "u") {
 				var func = GLUE.packetFunctions.get(messages[i].t);
 				if (func !== undefined)
 					func(messages[i].d);
@@ -40,8 +41,8 @@ var GlueClient = function(options={updateFPS: 60}) {
 	
 	GLUE.executeUpdates = function(messages) {
 		for (var i = 0; i < messages.length; i++) {
-			if (messages[i].t == "t") {
-				var func = GLUE.packetFunctions.get("t");
+			if (messages[i].t == "u") {
+				var func = GLUE.packetFunctions.get("u");
 				func(messages[i].d);
 			}
 		}
