@@ -6,6 +6,7 @@ var GlueClient = function(options={updateFPS: 60}) {
 
 	GLUE.init = function(ip) {
 		GLUE.ws = new WebSocket(ip);
+		GLUE.ws.binaryType = "arraybuffer";
 		GLUE.addPacketFunction("u", GLUE.updateObjects);
 		GLUE.addPacketFunction("a", GLUE.addObject);
 		GLUE.addPacketFunction("r", GLUE.removeObject);
@@ -14,33 +15,46 @@ var GlueClient = function(options={updateFPS: 60}) {
 			
 		}
 		GLUE.ws.onmessage = function(message) {
-			var data = JSON.parse(message.data);
+			var data = msgpack.decode(new Uint8Array(message.data));
 			
+			GLUE.executeFrame(data);
 			if (GLUE.frames.length < 1) {
-				GLUE.executeFrame(data.m);
+				GLUE.executeUpdates(data);
 			}
-			GLUE.frames.push(data.m);
-			GLUE.frameTimes.push(data.t);
+			GLUE.frames.push(data);
+			GLUE.frameTimes.push(message.timeStamp);
 		}
 	}
 
 	GLUE.executeFrame = function(messages) {
 		for (var i = 0; i < messages.length; i++) {
-			var func = GLUE.packetFunctions.get(messages[i].t);
-			if (func !== undefined)
+			if (messages[i].t != "t") {
+				var func = GLUE.packetFunctions.get(messages[i].t);
+				if (func !== undefined)
+					func(messages[i].d);
+				else
+					console.log("Packet function for " + messages[i].t + " is undefined");
+			}
+		}
+	}
+	
+	GLUE.executeUpdates = function(messages) {
+		for (var i = 0; i < messages.length; i++) {
+			if (messages[i].t == "t") {
+				var func = GLUE.packetFunctions.get("t");
 				func(messages[i].d);
-			else
-				console.log("Packet function for " + messages[i].t + " is undefined");
+			}
 		}
 	}
 
 	GLUE.update = function() {
 		GLUE.prevTime = GLUE.currentTime;
 		GLUE.currentTime = Date.now();
-		GLUE.dt = (GLUE.currentTime-GLUE.prevTime) / GLUE.updateTime;
+		GLUE.realTime = GLUE.currentTime-GLUE.prevTime;
+		GLUE.dt = (GLUE.realTime) / GLUE.updateTime;
 		
 		if (GLUE.packetsToSend.length > 0 && GLUE.ws.readyState == 1) {
-			GLUE.ws.send(JSON.stringify(GLUE.packetsToSend));
+			GLUE.ws.send(msgpack.encode(GLUE.packetsToSend));
 			GLUE.packetsToSend = [];
 		}
 		
@@ -57,7 +71,7 @@ var GlueClient = function(options={updateFPS: 60}) {
 				GLUE.frameTimes.splice(0, 1);
 				GLUE.time -= 1.0;
 				//execute all of next frame's functions
-				GLUE.executeFrame(GLUE.frames[0]);
+				GLUE.executeUpdates(GLUE.frames[0]);
 			}
 		}
 		if (GLUE.time > 1.5) GLUE.time = 1;
