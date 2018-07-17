@@ -117,7 +117,7 @@ var GlueClient = function(options={updateFPS: 60}) {
 	GLUE.addObject = function(pack) {
 		GLUE.objects.push(pack);
 		if (GLUE.classes.get(pack.t) != undefined) {
-			GLUE.instances.push(new (GLUE.classes.get(pack.t))());
+			GLUE.instances.push(new (GLUE.classes.get(pack.t))(pack));
 			GLUE.instances[GLUE.instances.length - 1].oldNetObj = pack;
 			GLUE.instances[GLUE.instances.length - 1].netObj = pack;
 		}
