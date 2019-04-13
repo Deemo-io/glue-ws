@@ -1,15 +1,54 @@
 {
-  "name": "match3",
-  "version": "0.0.1",
-  "description": "match",
-  "main": "index.js",
+  "_args": [
+    [
+      "glue-ws@0.1.0",
+      "C:\\Users\\Zack\\Dropbox\\LifeBall\\server"
+    ]
+  ],
+  "_from": "glue-ws@0.1.0",
+  "_id": "glue-ws@0.1.0",
+  "_inBundle": false,
+  "_integrity": "sha512-C8SBtVLtrAOraLB8po8rxdMVahIt30EBcIbFx7zJkygVxevUm2fYTDeEyMl4gyP1zxPDPTqflG8vzHZlw6o9Cw==",
+  "_location": "/glue-ws",
+  "_phantomChildren": {},
+  "_requested": {
+    "type": "version",
+    "registry": true,
+    "raw": "glue-ws@0.1.0",
+    "name": "glue-ws",
+    "escapedName": "glue-ws",
+    "rawSpec": "0.1.0",
+    "saveSpec": null,
+    "fetchSpec": "0.1.0"
+  },
+  "_requiredBy": [
+    "/"
+  ],
+  "_resolved": "https://registry.npmjs.org/glue-ws/-/glue-ws-0.1.0.tgz",
+  "_shasum": "9dbc20677421a602abe84e22e73c6bf514a286f9",
+  "_spec": "0.1.0",
+  "_where": "C:\\Users\\Zack\\Dropbox\\LifeBall\\server",
+  "author": {
+    "name": "Zack Seliger"
+  },
+  "bugs": {
+    "url": "https://github.com/Twist177/glue-ws/issues"
+  },
+  "bundleDependencies": false,
   "dependencies": {
-    "gameio": "0.0.35",
-    "glue-ws": "0.1.0"
+    "msgpack-lite": "0.1.26",
+    "uWebSockets.js": "github:uNetworking/uWebSockets.js#v15.9.0"
   },
-  "scripts": {
-    "start": "node index.js"
+  "deprecated": false,
+  "description": "minimalistic framework for websocket applications",
+  "homepage": "https://github.com/Twist177/glue-ws#readme",
+  "license": "ISC",
+  "main": "index.js",
+  "name": "glue-ws",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Twist177/glue-ws.git"
   },
-  "devDependencies": {},
-  "license": "ISC"
+  "version": "0.1.0"
 }
+
