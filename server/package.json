@@ -1,16 +1,15 @@
 {
-  "name": "glue-ws",
-  "version": "0.0.4",
-  "description": "minimalistic framework for websocket applications",
+  "name": "match3",
+  "version": "0.0.1",
+  "description": "match",
   "main": "index.js",
   "dependencies": {
-    "msgpack-lite": "0.1.26",
-    "uws": "9.148.0"
+    "gameio": "0.0.35",
+    "glue-ws": "0.1.0"
   },
-  "repository" : {
-	"type" : "git",
-	"url" : "https://github.com/Twist177/glue-ws"
+  "scripts": {
+    "start": "node index.js"
   },
-  "license": "ISC",
-  "author": "Zack Seliger"
+  "devDependencies": {},
+  "license": "ISC"
 }
