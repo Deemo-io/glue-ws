@@ -5,9 +5,52 @@ GLUE.updateTime = (1/60)*1000;
 GLUE.init = function(ip) {
 	GLUE.ws = new WebSocket(ip);
 	GLUE.ws.binaryType = "arraybuffer";
-	GLUE.addPacketFunction("u", GLUE.updateObjects);
-	GLUE.addPacketFunction("a", GLUE.addObject);
-	GLUE.addPacketFunction("r", GLUE.removeObject);
+	//update packet function
+	GLUE.addPacketFunction("u", function(pack) {
+		for (var i = 0; i < pack.length; i++) {
+			var index = GLUE.getObjectIndexFromID(pack[i].id);
+			if (index != -1) {
+				GLUE.objects[index] = pack[i];
+				
+				var index2 = GLUE.getInstanceIndexFromID(pack[i].id);
+				if (index2 != -1) {
+					GLUE.instances[index2].oldNetObj = GLUE.instances[index2].netObj;
+					GLUE.instances[index2].netObj = pack[i];
+					if (GLUE.instances[index2].onUpdate !== undefined) {
+						GLUE.instances[index2].onUpdate(pack[i]);
+					}
+				}
+			}
+		}
+	});
+	//add packet function
+	GLUE.addPacketFunction("a", function(pack) {
+		GLUE.objects.push(pack);
+		if (GLUE.classes.get(pack.t) != undefined) {
+			GLUE.instances.push(new (GLUE.classes.get(pack.t))());
+			GLUE.instances[GLUE.instances.length - 1].oldNetObj = pack;
+			GLUE.instances[GLUE.instances.length - 1].netObj = pack;
+			if (GLUE.instances[GLUE.instances.length - 1].onAdd !== undefined) {
+				GLUE.instances[GLUE.instances.length - 1].onAdd(pack);
+			}
+		}
+	});
+	//remove packet function
+	GLUE.addPacketFunction("r", function(pack) {
+		var index = GLUE.getObjectIndexFromID(pack.id);
+		if (index != -1) {
+			if (GLUE.instances[index].onRemove !== undefined) {
+				GLUE.instances[index].onRemove(pack[i]);
+			}
+			
+			GLUE.objects.splice(index, 1);
+			
+			var index2 = GLUE.getInstanceIndexFromID(pack.id);
+			if (index2 != -1) {
+				GLUE.instances.splice(index2, 1);
+			}
+		}
+	});
 	
 	GLUE.ws.onopen = function() {
 		
@@ -17,7 +60,7 @@ GLUE.init = function(ip) {
 		
 		GLUE.executeFrame(data);
 		if (GLUE.frames.length < 1) {
-			GLUE.executeUpdates(data);
+			//GLUE.executeUpdates(data);
 		}
 		GLUE.frames.push(data);
 		GLUE.frameTimes.push(message.timeStamp);
@@ -29,22 +72,11 @@ GLUE.init = function(ip) {
 
 GLUE.executeFrame = function(messages) {
 	for (var i = 0; i < messages.length; i++) {
-		if (messages[i].t != "u") {
-			var func = GLUE.packetFunctions.get(messages[i].t);
-			if (func !== undefined)
-				func(messages[i].d);
-			else
-				console.log("Packet function for " + messages[i].t + " is undefined");
-		}
-	}
-}
-
-GLUE.executeUpdates = function(messages) {
-	for (var i = 0; i < messages.length; i++) {
-		if (messages[i].t == "u") {
-			var func = GLUE.packetFunctions.get("u");
+		var func = GLUE.packetFunctions.get(messages[i].t);
+		if (func !== undefined)
 			func(messages[i].d);
-		}
+		else
+			console.log("Packet function for " + messages[i].t + " is undefined");
 	}
 }
 
@@ -58,26 +90,10 @@ GLUE.update = function() {
 		GLUE.packetsToSend = [];
 	}
 	
-	if (GLUE.frameTimes[0] == undefined || GLUE.frameTimes[1] == undefined)
-		return;
-	
-	var tick = (GLUE.currentTime - GLUE.prevTime) * GLUE.dt / (GLUE.frameTimes[1] - GLUE.frameTimes[0]);
-	GLUE.time += tick;
-	
-	if (GLUE.time >= 1.0) {
-		while (GLUE.frameTimes.length > 2) {
-			//advance to next frame
-			GLUE.frames.splice(0, 1);
-			GLUE.frameTimes.splice(0, 1);
-			GLUE.time -= 1.0;
-			//execute all of next frame's functions
-			GLUE.executeUpdates(GLUE.frames[0]);
-		}
-	}
-	if (GLUE.time > 1) GLUE.time = 1;
+	GLUE.time += GLUE.currentTime - GLUE.prevTime;
 }
 
-GLUE.sendPacket = function(type, pack) {
+GLUE.sendPacket = function(type, pack={}) {
 	pack.t = type;
 	GLUE.packetsToSend.push(pack);
 }
@@ -126,42 +142,6 @@ GLUE.getInstanceIndexFromID = function(id) {
 		}
 	}
 	return -1;
-}
-
-GLUE.addObject = function(pack) {
-	GLUE.objects.push(pack);
-	if (GLUE.classes.get(pack.t) != undefined) {
-		GLUE.instances.push(new (GLUE.classes.get(pack.t))());
-		GLUE.instances[GLUE.instances.length - 1].oldNetObj = pack;
-		GLUE.instances[GLUE.instances.length - 1].netObj = pack;
-	}
-}
-
-GLUE.removeObject = function(pack) {
-	var index = GLUE.getObjectIndexFromID(pack.id);
-	if (index != -1) {
-		GLUE.objects.splice(index, 1);
-		
-		var index2 = GLUE.getInstanceIndexFromID(pack.id);
-		if (index2 != -1) {
-			GLUE.instances.splice(index2, 1);
-		}
-	}
-}
-
-GLUE.updateObjects = function(pack) {
-	for (var i = 0; i < pack.length; i++) {
-		var index = GLUE.getObjectIndexFromID(pack[i].id);
-		if (index != -1) {
-			GLUE.objects[index] = pack[i];
-			
-			var index2 = GLUE.getInstanceIndexFromID(pack[i].id);
-			if (index2 != -1) {
-				GLUE.instances[index2].oldNetObj = GLUE.instances[index2].netObj;
-				GLUE.instances[index2].netObj = pack[i];
-			}
-		}
-	}
 }
 
 GLUE.defineObject = function(type, cl) {

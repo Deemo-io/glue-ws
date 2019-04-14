@@ -1,144 +1,213 @@
-//globals
-var GLUE = require('glue-ws').Server();
-PLAYER_WIDTH = 15;
-PLAYER_HEIGHT = 25;
-//collections
-players = [];
-blocks = [];
+//GLUE.js server
+exports.Server = function(options={updateFPS: 60, packetFPS: 20}) {
+	const server = require('uWebSockets.js').App;
+	const msgpack = require("msgpack-lite");
 
-function checkCollision(obj1, obj2) {
-	if (obj1.width === undefined) {
-		obj1.width = 1;
-		obj1.height = 1;
-	}
-	if (obj2.width === undefined) {
-		obj2.width = 1;
-		obj2.height = 1;
-	}
+	let GLUE = {app: null, clients: [], objects: [], id: 0, packetFunctions: new Map()};
+	GLUE.currTime = Date.now();
+	GLUE.prevTime = 0;
+	GLUE.dt = 0;
+	GLUE.realTime = 0;
+	GLUE.updateFPS = options.updateFPS;
+	GLUE.packetFPS = options.packetFPS;
+	GLUE.updateTime = (1/GLUE.updateFPS) * 1000;
+	GLUE.packetTime = (1/GLUE.packetFPS) * 1000;
 
-	return (obj1.x - obj1.width/2 < obj2.x + obj2.width/2 &&
-			obj1.x + obj1.width/2 > obj2.x - obj2.width/2 &&
-			obj1.y - obj1.height/2 < obj2.y + obj2.height/2 &&
-			obj1.y + obj1.height/2 > obj2.y - obj2.height/2);
-}
-
-class Player {
-	constructor(x, y) {
-		this.x = x || 0;
-		this.y = y || 0;
-		this.xVel = 0;
-		this.yVel = 0;
-		this.width = PLAYER_WIDTH;
-		this.height = PLAYER_HEIGHT;
-		this.controls = {left: false, right: false, up: false, down: false};
-		this.inputNumber = 0;
-		this.speed = 3;
-		this.canJump = false;
-		this.upEnabled = false;
-		this.numJumps = 0;
-		this.maxJumps = 2;
-
-		players.push(this);
-	}
-	update(dt) {
-		var prevx = this.x;
-		var prevy = this.y;
-
-		this.xVel = 0;
-		//get input/move on x axis
-		if (this.controls.left) {
-			this.xVel = -this.speed;
+	function safelyParseMessage(message) {
+		var parsed;
+		
+		try {
+			parsed = msgpack.decode( new Uint8Array(message));
 		}
-		if (this.controls.right) {
-			this.xVel = this.speed;
+		catch(e) {
+			
 		}
-		this.x += this.xVel * dt;
-		//check for x axis collision
-		for (var i = 0; i < blocks.length; i++) {
-			if (checkCollision(this, blocks[i])) {
-				this.x = prevx;
-				break;
+		
+		return parsed;
+	}
+
+	GLUE.addObject = function(type, obj) {
+		obj.t = type;
+		GLUE.objects.push(obj);
+		obj.id = GLUE.id;
+		GLUE.id++;
+		GLUE.sendPacket("a", GLUE.getAddPacket(obj));
+		return obj;
+	}
+	GLUE.removeObject = function(obj) {
+		let index = GLUE.objects.indexOf(obj);
+		if (index != -1)
+			GLUE.objects.splice(index, 1);
+		GLUE.sendPacket("r", GLUE.getRemovePacket(obj));
+	}
+
+	GLUE.update = function() {
+		GLUE.currTime = Date.now();
+		GLUE.realTime = GLUE.currTime - GLUE.prevTime;
+		GLUE.dt = GLUE.realTime / GLUE.updateTime;
+		GLUE.prevTime = GLUE.currTime;
+		
+		//update all objects, remove the ones we need to remove
+		for (let i = 0; i < GLUE.objects.length; i++) {
+			GLUE.objects[i].update(GLUE.dt);
+			if (GLUE.objects[i] != undefined && GLUE.objects[i].dead !== undefined && GLUE.objects[i].dead === true) {
+				GLUE.remove(GLUE.objects[i]);
+				i--;
 			}
 		}
+		
+		//schedule next call to update
+		let endTime = Date.now();
+		if (endTime - GLUE.currTime < GLUE.updateTime) {
+			setTimeout(GLUE.update, GLUE.updateTime - (endTime - GLUE.currTime));
+		}
+		else {
+			setImmediate(GLUE.update);
+		}
+	}
 
-		//move on y axis
-		if (this.canJump && this.upEnabled == true && this.controls.up) {
-			this.yVel = -10;
-			this.upEnabled = false;
-			this.numJumps += 1;
-			if (this.numJumps >= this.maxJumps)
-				this.canJump = false;
+	GLUE.packetUpdate = function() {
+		let startTime = Date.now();
+		let objs = [];
+		for (let i = 0; i < GLUE.objects.length; i++) {
+			const pack = GLUE.getUpdatePacket(GLUE.objects[i]);
+			if (pack !== undefined)
+				objs.push(pack);
 		}
-		if (!this.controls.up) {
-			this.upEnabled = true;
+		if (objs.length > 0)
+			GLUE.sendPacket("u", objs);
+		
+		//send packets to clients that have awaiting packets
+		for (let i = 0; i < GLUE.clients.length; i++) {
+			if (GLUE.clients[i].packetsToSend.length > 0) {
+				let frame = GLUE.clients[i].packetsToSend;
+				GLUE.clients[i].send(msgpack.encode(frame), true);
+				GLUE.clients[i].packetsToSend = [];
+			}
 		}
-		this.yVel += 0.7;
-		this.y += this.yVel * dt;
-		//check for y axis collision
-		for (var i = 0; i < blocks.length; i++) {
-			if (checkCollision(this, blocks[i])) {
-				if (this.yVel > 0) {
-					this.canJump = true;
-					this.numJumps = 0;
+		
+		//schedule next call
+		let endTime = Date.now();
+		if (endTime - startTime < GLUE.packetTime) {
+			setTimeout(GLUE.packetUpdate, GLUE.packetTime - (endTime - startTime));
+		}
+		else {
+			setImmediate(GLUE.packetUpdate);
+		}
+	}
+
+	GLUE.sendPacket = function(type, data, client) {
+		const pack = {t: type, d: data};
+		if (client == undefined) {
+			for (let i = 0; i < GLUE.clients.length; i++) {
+				GLUE.clients[i].packetsToSend.push(pack);
+			}
+		}
+		else {
+			client.packetsToSend.push(pack);
+		}
+	}
+
+	GLUE.addPacketFunction = function(type, func) {
+		GLUE.packetFunctions.set(type, func);
+	}
+
+	GLUE.getAddPacket = function(obj) {
+		let pack = {};
+		if (obj.addPacket !== undefined)
+			pack = obj.addPacket();
+		
+		pack = GLUE.roundFloatsInObj(pack);
+		pack.id = obj.id;
+		pack.t = obj.t;
+		return pack;
+	}
+	GLUE.getRemovePacket = function(obj) {
+		let pack = {};
+		if (obj.removePacket !== undefined)
+			pack = obj.removePacket();
+		
+		pack = GLUE.roundFloatsInObj(pack);
+		pack.id = obj.id;
+		pack.t = obj.t;
+		return pack;
+	}
+	GLUE.getUpdatePacket = function(obj) {
+		let pack = {};
+		if (obj.updatePacket !== undefined)
+			pack = obj.updatePacket();
+		else
+			return undefined;
+		
+		pack = GLUE.roundFloatsInObj(pack);
+		pack.id = obj.id;
+		pack.t = obj.t;
+		return pack;
+	}
+
+	GLUE.roundFloatsInObj = function(pack) {
+		for (let key in pack) {
+			if (Number(pack[key]) === pack[key] && pack[key] % 1 !== 0) {
+				pack[key] = Math.floor(pack[key] * 100);
+				pack[key] /= 100;
+			}
+		}
+		return pack;
+	}
+
+	GLUE.start = function(port=8443) {
+		GLUE.update();
+		GLUE.packetUpdate();
+		
+		//setup websocket server
+		GLUE.app = new server().ws('/*', {
+			idleTimeout: 1800,
+			maxPayloadLength: 64 * 1024 * 1024,
+			open: (socket) => {
+				socket.packetsToSend = [];
+				GLUE.clients.push(socket);
+				for (let i = 0; i < GLUE.objects.length; i++) {
+					GLUE.sendPacket("a", GLUE.getAddPacket(GLUE.objects[i]), socket);
 				}
-				this.y = prevy;
-				this.yVel = 0;
-				break;
+				GLUE.onConnect(socket);
+			},
+			message: (socket, message) => {
+				let messages = safelyParseMessage(message);
+				for (let i = 0; i < messages.length; i++) {
+					let func = GLUE.packetFunctions.get(messages[i].t);
+					if (func !== undefined)
+						func(messages[i], socket);
+					else
+						console.log("Packet function for " + messages[i].t + " is undefined");
+				}
+			},
+			drain: (socket) => {
+				console.log("drain");
+			},
+			close: (socket) => {
+				GLUE.onDisconnect(socket);
+				let index = GLUE.clients.indexOf(socket);
+				if (index != -1)
+					GLUE.clients.splice(index, 1);
 			}
-		}
+		});
+		
+		//start listening on given port
+		GLUE.app.listen(port, (token) => {
+			if (token) {
+				console.log("GLUE listening on port "+port+"...");
+			}
+			else {
+				console.log("GLUE failed to listen on port "+port+"...");
+			}
+		});
+	}
 
-		//dying
-		if (this.y > 1000) this.dead = true;
+	GLUE.onConnect = function(socket) {
+		
 	}
-	addPacket() {
-		return {x: this.x, y: this.y, width: this.width, height: this.height};
+	GLUE.onDisconnect = function(socket) {
+		
 	}
-	updatePacket() {
-		return {x: this.x, y: this.y, n: this.inputNumber};
-	}
-	/*removePacket() {
-		var index = players.indexOf(this);
-		if (index != -1) players.splice(index, 1);
-	}*/
+	return GLUE;
 }
-
-class Block {
-	constructor(x, y, w, h) {
-		this.x = x;
-		this.y = y;
-		this.width = w;
-		this.height = h;
-		blocks.push(this);
-	}
-	update() {}
-	addPacket() {
-		return {x: this.x, y: this.y, width: this.width, height: this.height};
-	}
-}
-
-GLUE.onConnect = function(socket) {
-	socket.player = GLUE.addObject("p", new Player(640,360));
-	GLUE.sendPacket("i", {id: socket.player.id}, socket);
-}
-GLUE.onDisconnect = function(socket) {
-	if (socket.player !== undefined) {
-		GLUE.removeObject(socket.player);
-	}
-}
-
-GLUE.addPacketFunction("c", function(pack, ws) {
-	ws.player.controls = pack;
-	ws.player.inputNumber += 1;
-});
-
-function main() {
-
-}
-setInterval(main, 50);//20 fps
-
-GLUE.start(8080);
-GLUE.addObject("b", new Block(640,720,1280,50));
-GLUE.addObject("b", new Block(640,0,1280,50));
-GLUE.addObject("b", new Block(1280,360,50,720));
-GLUE.addObject("b", new Block(0,360,50,720));
-GLUE.addObject("b", new Block(300,600,100,20));

@@ -1,10 +1,4 @@
 {
-  "_args": [
-    [
-      "glue-ws@0.1.0",
-      "C:\\Users\\Zack\\Dropbox\\LifeBall\\server"
-    ]
-  ],
   "_from": "glue-ws@0.1.0",
   "_id": "glue-ws@0.1.0",
   "_inBundle": false,
@@ -25,9 +19,9 @@
     "/"
   ],
   "_resolved": "https://registry.npmjs.org/glue-ws/-/glue-ws-0.1.0.tgz",
-  "_shasum": "9dbc20677421a602abe84e22e73c6bf514a286f9",
-  "_spec": "0.1.0",
-  "_where": "C:\\Users\\Zack\\Dropbox\\LifeBall\\server",
+  "_shasum": "f89e0aaa75acaee0dd38868a20fcf39686bf5ae8",
+  "_spec": "glue-ws@0.1.0",
+  "_where": "C:\\Users\\Zack\\Desktop\\onlinegame",
   "author": {
     "name": "Zack Seliger"
   },
@@ -49,6 +43,5 @@
     "type": "git",
     "url": "git+https://github.com/Twist177/glue-ws.git"
   },
-  "version": "0.1.0"
+  "version": "0.2.0"
 }
-
