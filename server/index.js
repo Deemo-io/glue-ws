@@ -51,7 +51,7 @@ exports.Server = function(options={updateFPS: 60, packetFPS: 20}) {
 		for (let i = 0; i < GLUE.objects.length; i++) {
 			GLUE.objects[i].update(GLUE.dt);
 			if (GLUE.objects[i] != undefined && GLUE.objects[i].dead !== undefined && GLUE.objects[i].dead === true) {
-				GLUE.remove(GLUE.objects[i]);
+				GLUE.removeObject(GLUE.objects[i]);
 				i--;
 			}
 		}

@@ -40,7 +40,7 @@ GLUE.init = function(ip) {
 		var index = GLUE.getObjectIndexFromID(pack.id);
 		if (index != -1) {
 			if (GLUE.instances[index].onRemove !== undefined) {
-				GLUE.instances[index].onRemove(pack[i]);
+				GLUE.instances[index].onRemove(pack);
 			}
 			
 			GLUE.objects.splice(index, 1);
