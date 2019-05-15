@@ -1,9 +1,9 @@
 //GLUE.js server
 exports.Server = function(options={updateFPS: 60, packetFPS: 20}) {
-	const server = require('uWebSockets.js').App;
+	const server = require('ws').Server;
 	const msgpack = require("msgpack-lite");
 
-	let GLUE = {app: null, clients: [], objects: [], id: 0, packetFunctions: new Map()};
+	let GLUE = {wss: null, clients: [], objects: [], id: 0, packetFunctions: new Map()};
 	GLUE.currTime = Date.now();
 	GLUE.prevTime = 0;
 	GLUE.dt = 0;
@@ -17,7 +17,7 @@ exports.Server = function(options={updateFPS: 60, packetFPS: 20}) {
 		var parsed;
 		
 		try {
-			parsed = msgpack.decode( new Uint8Array(message));
+			parsed = msgpack.decode(new Uint8Array(message));
 		}
 		catch(e) {
 			
@@ -79,7 +79,7 @@ exports.Server = function(options={updateFPS: 60, packetFPS: 20}) {
 		
 		//send packets to clients that have awaiting packets
 		for (let i = 0; i < GLUE.clients.length; i++) {
-			if (GLUE.clients[i].packetsToSend.length > 0) {
+			if (GLUE.clients[i].readyState === 1 && GLUE.clients[i].packetsToSend.length > 0) {
 				let frame = GLUE.clients[i].packetsToSend;
 				GLUE.clients[i].send(msgpack.encode(frame), true);
 				GLUE.clients[i].packetsToSend = [];
@@ -160,7 +160,36 @@ exports.Server = function(options={updateFPS: 60, packetFPS: 20}) {
 		GLUE.packetUpdate();
 		
 		//setup websocket server
-		GLUE.app = new server().ws('/*', {
+		GLUE.wss = new server({port: port});
+		
+		GLUE.wss.on('connection', function(ws) {
+			ws.packetsToSend = [];
+			GLUE.clients.push(ws);
+			for (let i = 0; i < GLUE.objects.length; i++) {
+				GLUE.sendPacket("a", GLUE.getAddPacket(GLUE.objects[i]), ws);
+			}
+			GLUE.onConnect(ws);
+			
+			ws.on('message', function(m) {
+				let messages = safelyParseMessage(m);
+				for (let i = 0; i < messages.length; i++) {
+					let func = GLUE.packetFunctions.get(messages[i].t);
+					if (func !== undefined)
+						func(messages[i], ws);
+					else
+						console.log("Packet function for " + messages[i].t + " is undefined");
+				}
+			});
+			ws.on('close', function() {
+				GLUE.onDisconnect(ws);
+				let index = GLUE.clients.indexOf(ws);
+				if (index !== -1) {
+					GLUE.clients.splice(index, 1);
+				}
+				ws.terminate();
+			});
+		});
+		/*GLUE.app = new server().ws('/*', {
 			idleTimeout: 1800,
 			maxPayloadLength: 64 * 1024 * 1024,
 			open: (socket) => {
@@ -200,7 +229,7 @@ exports.Server = function(options={updateFPS: 60, packetFPS: 20}) {
 			else {
 				console.log("GLUE failed to listen on port "+port+"...");
 			}
-		});
+		});*/
 	}
 
 	GLUE.onConnect = function(socket) {
