@@ -91,7 +91,7 @@ GlueClient.prototype.executeFrame = function(messages) {
   for (let i = 0; i < messages.length; i++) {
     let funcArr = this.packetFunctions.get(messages[i].t);
     if (funcArr === undefined) funcArr = []; //error-catching. Allows program
-                                             //to continue if no listeners have been defined
+                                                 //to continue if no listeners have been defined
 
     for (let j = 0; j < funcArr.length; j++) {
       funcArr[j](messages[i].d);
