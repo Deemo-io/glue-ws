@@ -13,8 +13,8 @@ function safelyParseMessage(message) {
   return parsed;
 }
 
-//a room contains objects and clients. Objects and clients can be in more than
-//one room. Clients conntected to a room get packets relating to the room
+//a room contains objects and clients. Objects can be in more than one room
+//but clients can't. Clients conntected to a room get packets relating to the room
 function Room(name) {
   this.name = name;
   this.clients = [];
@@ -205,9 +205,8 @@ Server.prototype.update = function() {
       }
     }
 
-    //after updating every object in this room, call 'onRoomUpdate' if defined
-    if (this.onRoomUpdate) {
-      this.onRoomUpdate(room, room.name);
+    if (room.update) {
+      room.update();
     }
   });
 
@@ -393,10 +392,8 @@ Server.prototype.start = function(options={}) {
 //user
 //'onConnect' is called when a client connects to server
 //'onDisconnect' is called when a client disconnects from the server
-//'onRoomUpdate' is called after updating a room. The room and roomName is made available
 Server.prototype.onConnect = function(socket) {}
 Server.prototype.onDisconnect = function(socket) {}
-Server.prototype.onRoomUpdate = function(room, roomName) {}
 
 //export the server
 module.exports = { Server };
